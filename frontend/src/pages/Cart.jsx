@@ -13,12 +13,23 @@ export default function Cart() {
     if (!userId) { setLoading(false); return; }
     try {
       const res = await api.get(`/cart/${userId}`);
-      setCart(res.data);
+      const data = res.data;
 
-      // ✅ FIX: sync cartCount to localStorage so navbar always reflects reality
-      const count = res.data?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+      // ✅ FIX: filter out any items where productId is null (deleted products)
+      if (data && data.items) {
+        data.items = data.items.filter(
+          (item) => item.productId !== null && item.productId !== undefined
+        );
+      }
+
+      setCart(data || { items: [] });
+
+      // sync cart count to navbar
+      const count = data?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
       localStorage.setItem("cartCount", count);
 
+    } catch {
+      setCart({ items: [] });
     } finally {
       setLoading(false);
     }
@@ -28,19 +39,25 @@ export default function Cart() {
 
   const removeItem = async (productId) => {
     setUpdatingId(productId);
-    await api.post(`/cart/remove`, { userId, productId });
-    await loadCart();                                  // loadCart now syncs count too
-    window.dispatchEvent(new Event("cartUpdated"));
-    setUpdatingId(null);
+    try {
+      await api.post(`/cart/remove`, { userId, productId });
+      await loadCart();
+      window.dispatchEvent(new Event("cartUpdated"));
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const updateQty = async (productId, quantity) => {
     if (quantity === 0) { await removeItem(productId); return; }
     setUpdatingId(productId);
-    await api.post(`/cart/update`, { userId, productId, quantity });
-    await loadCart();                                  // loadCart now syncs count too
-    window.dispatchEvent(new Event("cartUpdated"));
-    setUpdatingId(null);
+    try {
+      await api.post(`/cart/update`, { userId, productId, quantity });
+      await loadCart();
+      window.dispatchEvent(new Event("cartUpdated"));
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   if (loading) return (
@@ -72,19 +89,17 @@ export default function Cart() {
       </p>
       <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
         {!userId && (
-          <Link to="/login" className="btn-primary" style={{ textDecoration: "none", padding: "12px 28px" }}>
-            Login
-          </Link>
+          <Link to="/login" className="btn-primary" style={{ textDecoration: "none", padding: "12px 28px" }}>Login</Link>
         )}
-        <Link to="/" className="btn-ghost" style={{ textDecoration: "none", padding: "12px 28px" }}>
-          Browse Products
-        </Link>
+        <Link to="/" className="btn-ghost" style={{ textDecoration: "none", padding: "12px 28px" }}>Browse Products</Link>
       </div>
     </div>
   );
 
-  const total = cart.items?.reduce((sum, item) => sum + item.productId.price * item.quantity, 0) || 0;
-  const itemCount = cart.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  // ✅ FIX: safe total — skip any item where productId is somehow still null
+  const safeItems = cart.items?.filter(item => item.productId && item.productId.price != null) || [];
+  const total = safeItems.reduce((sum, item) => sum + item.productId.price * item.quantity, 0);
+  const itemCount = safeItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="page-enter" style={{ minHeight: "calc(100vh - 64px)", padding: "40px 24px 80px" }}>
@@ -100,7 +115,7 @@ export default function Cart() {
           </p>
         </div>
 
-        {cart.items.length === 0 ? (
+        {safeItems.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🛍️</div>
             <p style={{ color: "var(--text-muted)", fontSize: 16 }}>Your cart is empty</p>
@@ -110,8 +125,9 @@ export default function Cart() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start" }} className="cart-grid">
+            {/* Items list */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {cart.items.map(item => (
+              {safeItems.map(item => (
                 <div
                   key={item.productId._id}
                   className="card"
@@ -121,6 +137,7 @@ export default function Cart() {
                     transition: "opacity 0.2s",
                   }}
                 >
+                  {/* Image */}
                   <Link to={`/product/${item.productId._id}`} style={{
                     flexShrink: 0, width: 80, height: 80,
                     background: "#1a1a26", borderRadius: 12,
@@ -135,6 +152,7 @@ export default function Cart() {
                     />
                   </Link>
 
+                  {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <Link to={`/product/${item.productId._id}`} style={{ textDecoration: "none" }}>
                       <h3 style={{
@@ -147,32 +165,30 @@ export default function Cart() {
                     </p>
                   </div>
 
+                  {/* Qty controls */}
                   <div style={{
                     display: "flex", alignItems: "center",
                     background: "var(--bg-secondary)", borderRadius: 10,
                     border: "1px solid var(--border)", overflow: "hidden",
                   }}>
-                    <button
-                      onClick={() => updateQty(item.productId._id, item.quantity - 1)}
-                      style={{ width: 34, height: 34, background: "transparent", border: "none", color: "var(--text-primary)", cursor: "pointer", fontSize: 16 }}
-                    >−</button>
+                    <button onClick={() => updateQty(item.productId._id, item.quantity - 1)}
+                      style={{ width: 34, height: 34, background: "transparent", border: "none", color: "var(--text-primary)", cursor: "pointer", fontSize: 16 }}>−</button>
                     <span style={{ width: 36, textAlign: "center", fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
                       {item.quantity}
                     </span>
-                    <button
-                      onClick={() => updateQty(item.productId._id, item.quantity + 1)}
-                      style={{ width: 34, height: 34, background: "transparent", border: "none", color: "var(--text-primary)", cursor: "pointer", fontSize: 16 }}
-                    >+</button>
+                    <button onClick={() => updateQty(item.productId._id, item.quantity + 1)}
+                      style={{ width: 34, height: 34, background: "transparent", border: "none", color: "var(--text-primary)", cursor: "pointer", fontSize: 16 }}>+</button>
                   </div>
 
+                  {/* Subtotal */}
                   <div style={{ textAlign: "right", minWidth: 80 }}>
                     <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
                       ₹{(item.productId.price * item.quantity).toLocaleString("en-IN")}
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => removeItem(item.productId._id)}
+                  {/* Remove */}
+                  <button onClick={() => removeItem(item.productId._id)}
                     style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 18, padding: 4, transition: "color 0.15s", lineHeight: 1 }}
                     onMouseEnter={e => e.target.style.color = "var(--danger)"}
                     onMouseLeave={e => e.target.style.color = "var(--text-muted)"}
@@ -181,6 +197,7 @@ export default function Cart() {
               ))}
             </div>
 
+            {/* Order Summary */}
             <div className="card" style={{ padding: 24, position: "sticky", top: 80 }}>
               <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 700, marginBottom: 20, color: "var(--text-primary)" }}>
                 Order Summary
@@ -191,8 +208,7 @@ export default function Cart() {
                   <span>₹{total.toLocaleString("en-IN")}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "var(--success)" }}>
-                  <span>Delivery</span>
-                  <span>Free</span>
+                  <span>Delivery</span><span>Free</span>
                 </div>
                 <div style={{ height: 1, background: "var(--border)" }} />
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 700 }}>
