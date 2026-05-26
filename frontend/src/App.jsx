@@ -10,15 +10,14 @@ import Navbar from "./components/Navbar";
 import Cart from "./pages/Cart";
 import CheckoutAddress from "./pages/CheckoutAddress";
 import Checkout from "./pages/Checkout";
-
-import OrderSuccess from "./pages/OrderSucess";
+import OrderSuccess from "./pages/OrderSuccess";
 
 function Layout() {
   return (
-    <>
+    <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
       <Navbar />
       <Outlet />
-    </>
+    </div>
   );
 }
 
@@ -26,18 +25,17 @@ const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { path: "/", element: <Home /> },
-      { path: "/login", element: <Login /> },
-      { path: "/signup", element: <Signup /> },
-      { path: "/product/:id", element: <ProductDetails /> },
-      { path : "/cart", element: <Cart />},
-
-      { path: "/admin/products", element: <ProductList /> },
-      { path: "/admin/products/add", element: <AddProduct /> },
+      { path: "/",                        element: <Home /> },
+      { path: "/login",                   element: <Login /> },
+      { path: "/signup",                  element: <Signup /> },
+      { path: "/product/:id",             element: <ProductDetails /> },
+      { path: "/cart",                    element: <Cart /> },
+      { path: "/admin/products",          element: <ProductList /> },
+      { path: "/admin/products/add",      element: <AddProduct /> },
       { path: "/admin/products/edit/:id", element: <EditProduct /> },
-      { path: "/checkout-address", element: <CheckoutAddress /> },
-      { path: "/checkout", element: <Checkout /> },
-      { path: "/order-success/:id", element:<OrderSuccess /> }
+      { path: "/checkout-address",        element: <CheckoutAddress /> },
+      { path: "/checkout",                element: <Checkout /> },
+      { path: "/order-success/:id",       element: <OrderSuccess /> },
     ],
   },
 ]);

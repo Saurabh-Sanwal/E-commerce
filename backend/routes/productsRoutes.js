@@ -1,10 +1,20 @@
 import express from "express";
-import {createProduct, deleteProduct ,getProducts, updateProduct} from "../controllers/productController.js"
+import {
+  createProduct,
+  deleteProduct,
+  getProducts,
+  updateProduct,
+} from "../controllers/productController.js";
+import { protect, adminOnly } from "../middleware/authMiddleware.js";
+
 const router = express.Router();
 
-router.post('/add', createProduct);
-router.get('/', getProducts);
-router.put('/update/:id',updateProduct)
-router.delete('/delete/:id', deleteProduct)
+// PUBLIC - anyone can view products
+router.get("/", getProducts);
+
+// ADMIN ONLY - must be logged in AND be an admin email
+router.post("/add",          protect, adminOnly, createProduct);
+router.put("/update/:id",    protect, adminOnly, updateProduct);
+router.delete("/delete/:id", protect, adminOnly, deleteProduct);
 
 export default router;
